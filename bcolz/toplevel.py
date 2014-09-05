@@ -536,7 +536,7 @@ def walk(dir, classname=None, mode='a'):
 
 class cparams(object):
     """
-    cparams(clevel=None, shuffle=None, cname=None)
+    cparams(clevel=None, shuffle=None, cname=None, cstrings=None)
 
     Class to host parameters for compression and other filters.
 
@@ -548,6 +548,9 @@ class cparams(object):
         Whether the shuffle filter is active or not.
     cname : string ('blosclz', 'lz4', 'lz4hc', 'snappy', 'zlib')
         Select the compressor to use inside Blosc.
+    cstrings : bool
+        Whether the strings should be stored as C strings or Python strings.
+        Only valid for plain strings and not any other dtype including Unicode.
 
     In case some of the parameters are not passed, they will be
     set to a default (see `setdefaults()` method).
@@ -573,8 +576,13 @@ class cparams(object):
         """The compressor name."""
         return self._cname
 
+    @property
+    def cstrings(self):
+        """A C string?"""
+        return self._cstrings
+
     @staticmethod
-    def _checkparams(clevel, shuffle, cname):
+    def _checkparams(clevel, shuffle, cname, cstrings):
         if clevel is not None:
             if not isinstance(clevel, int):
                 raise ValueError("`clevel` must be an int.")
@@ -590,11 +598,15 @@ class cparams(object):
             if cname not in list_cnames:
                 raise ValueError(
                     "Compressor '%s' is not available in this build" % cname)
-        return clevel, shuffle, cname
+        if cstrings is not None:
+            if not isinstance(cstrings, (bool, int)):
+                raise ValueError("`cstrings` must be a boolean.")
+            cstrings = bool(cstrings)
+        return clevel, shuffle, cname, cstrings
 
     @staticmethod
-    def setdefaults(clevel=None, shuffle=None, cname=None):
-        """Change the defaults for `clevel`, `shuffle` and `cname` params.
+    def setdefaults(clevel=None, shuffle=None, cname=None, cstrings=None):
+        """Change the defaults for `clevel`, `shuffle`, `cname` and others.
 
         Parameters
         ----------
@@ -604,9 +616,12 @@ class cparams(object):
             Whether the shuffle filter is active or not.
         cname : string ('blosclz', 'lz4', 'lz4hc', 'snappy', 'zlib')
             Select the compressor to use inside Blosc.
+        cstrings : bool
+            Whether the strings should be stored as C strings or Python strings.
 
         If this method is not called, the defaults will be set as in
-        defaults.py (``{clevel=5, shuffle=True, cname='blosclz'}``).
+        defaults.py:
+        ``{clevel=5, shuffle=True, cname='blosclz', cstrings=True}``.
 
         """
         clevel, shuffle, cname = cparams._checkparams(clevel, shuffle, cname)
@@ -614,18 +629,22 @@ class cparams(object):
         if clevel is not None: dflts['clevel'] = clevel
         if shuffle is not None: dflts['shuffle'] = shuffle
         if cname is not None: dflts['cname'] = cname
+        if cstrings is not None: dflts['cstrings'] = cstrings
 
-    def __init__(self, clevel=None, shuffle=None, cname=None):
-        clevel, shuffle, cname = cparams._checkparams(clevel, shuffle, cname)
+    def __init__(self, clevel=None, shuffle=None, cname=None, cstrings=None):
+        clevel, shuffle, cname, cstrings = cparams._checkparams(
+            clevel, shuffle, cname, cstrings)
         dflts = bcolz.defaults.cparams
         self._clevel = dflts['clevel'] if clevel is None else clevel
         self._shuffle = dflts['shuffle'] if shuffle is None else shuffle
         self._cname = dflts['cname'] if cname is None else cname
+        self._cstrings = dflts['cstrings'] if cstrings is None else cstrings
 
     def __repr__(self):
         args = ["clevel=%d" % self._clevel,
                 "shuffle=%s" % self._shuffle,
                 "cname='%s'" % self._cname,
+                "cstrings=%s" % self._cstrings,
                 ]
         return '%s(%s)' % (self.__class__.__name__, ', '.join(args))
 

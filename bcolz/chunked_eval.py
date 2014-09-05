@@ -128,17 +128,17 @@ def eval(expression, vm=None, out_flavor=None, user_dict={}, **kwargs):
     typesize, vlen = 0, 1
     for name in vars:
         var = vars[name]
-        if hasattr(var, "__len__") and not hasattr(var, "dtype"):
-            raise ValueError("only numpy/carray sequences supported")
-        if hasattr(var, "dtype") and not hasattr(var, "__len__"):
+        if (not hasattr(var, "dtype") or
+            not hasattr(var, "__len__") or
+            np.isscalar(var)):
+            # This is probably a Python object.  Let it pass-through.
             continue
-        if hasattr(var, "dtype"):  # numpy/carray arrays
-            if isinstance(var, np.ndarray):  # numpy array
-                typesize += var.dtype.itemsize * np.prod(var.shape[1:])
-            elif isinstance(var, bcolz.carray):  # carray array
-                typesize += var.dtype.itemsize
-            else:
-                raise ValueError("only numpy/carray objects supported")
+        if isinstance(var, np.ndarray):  # numpy array
+            typesize += var.dtype.itemsize * np.prod(var.shape[1:])
+        elif isinstance(var, bcolz.carray):  # carray array
+            typesize += var.dtype.itemsize
+        else:
+            raise ValueError("only numpy/carray objects supported")
         if hasattr(var, "__len__"):
             if vlen > 1 and vlen != len(var):
                 raise ValueError("arrays must have the same length")
@@ -183,7 +183,7 @@ def _eval_blocks(expression, vars, vlen, typesize, vm, out_flavor,
     maxndims = 0
     for name in vars:
         var = vars[name]
-        if hasattr(var, "__len__"):
+        if hasattr(var, 'dtype') and hasattr(var, "__len__"):
             ndims = len(var.shape) + len(var.dtype.shape)
             if ndims > maxndims:
                 maxndims = ndims

@@ -36,13 +36,16 @@ class Defaults(object):
                 "passed '%s' " % type(value))
         if ('clevel' not in value or
             'shuffle' not in value or
-            'cname' not in value):
+            'cname' not in value or
+            'cstrings' not in value):
             raise ValueError(
                 "The dictionary must have the next entries: "
-                "'clevel', 'shuffle' and 'cname'")
-        clevel, shuffle, cname = bcolz.cparams._checkparams(
-            value['clevel'], value['shuffle'], value['cname'])
-        return {'clevel': clevel, 'shuffle': shuffle, 'cname': cname}
+                "'clevel', 'shuffle', 'cname' and 'cstrings'")
+        clevel, shuffle, cname, cstrings = bcolz.cparams._checkparams(
+            value['clevel'], value['shuffle'], value['cname'],
+            value['cstrings'])
+        return {'clevel': clevel, 'shuffle': shuffle, 'cname': cname,
+                'cstrings': cstrings}
 
     #
     # Properties start here...
@@ -97,7 +100,8 @@ be 'numexpr' or 'python'.  Default is 'numexpr', if it is installed.
 If not, then the default is 'python'.
 """
 
-defaults.cparams = {'clevel': 5, 'shuffle': True, 'cname': 'blosclz'}
+defaults.cparams = {
+    'clevel': 5, 'shuffle': True, 'cname': 'blosclz', 'cstrings': True}
 """
 The defaults for parameters used in compression.  You can change
 them more comfortably by using the `cparams.setdefaults()` method.

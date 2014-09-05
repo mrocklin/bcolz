@@ -97,8 +97,10 @@ cdef extern from "blosc.h":
                              size_t *cbytes, size_t *blocksize)
     void blosc_cbuffer_metainfo(void *cbuffer, size_t *typesize, int *flags)
     void blosc_cbuffer_versions(void *cbuffer, int *version, int *versionlz)
-    void blosc_set_blocksize(size_t blocksize)
-    char*blosc_list_compressors()
+    void blosc_set_blocksize(size_t size)
+    void blosc_set_cstrings(size_t size)
+    void blosc_unset_cstrings()
+    char* blosc_list_compressors()
 
 
 #----------------------------------------------------------------------------
@@ -283,6 +285,7 @@ cdef class chunk:
 
     """
     cdef char typekind, isconstant
+    cdef public char cstrings
     cdef public int atomsize, itemsize, blocksize
     cdef public int nbytes, cbytes, cdbytes
     cdef int true_count
@@ -311,6 +314,7 @@ cdef class chunk:
         self.atomsize = atom.itemsize
         dtype_ = atom.base
         self.typekind = dtype_.kind
+        self.cstrings = cparams.cstrings
         # Hack for allowing strings with len > BLOSC_MAX_TYPESIZE
         if self.typekind == 'S':
             itemsize = 1
@@ -417,12 +421,18 @@ cdef class chunk:
             raise ValueError(
                 "Compressor '%s' is not available in this build" % cname)
         dest = <char *> malloc(nbytes + BLOSC_MAX_OVERHEAD)
+        if self.cstrings:
+            # Activate the cstrings filter in Blosc
+            blosc_set_cstrings(self.atomsize)
         with nogil:
             ret = blosc_compress(clevel, shuffle, itemsize, nbytes,
                                  data, dest, nbytes + BLOSC_MAX_OVERHEAD)
         if ret <= 0:
             raise RuntimeError(
                 "fatal error during Blosc compression: %d" % ret)
+        if self.cstrings:
+            # Deactivate the cstrings filter
+            blosc_unset_cstrings()
         # Free the unused data
         cbytes = ret;
         self.data = <char *> realloc(dest, cbytes)
@@ -1069,6 +1079,11 @@ cdef class carray:
         if dtype is None:
             dtype = array_.dtype.base
 
+        # A true cstrings param is only valid for np.string_ and 'blosclz'
+        if (cparams.cstrings is True and 
+            (dtype.type != np.string_ or cparams.cname != "blosclz")):
+            cparams._cstrings = False
+
         # Multidimensional array.  The atom will have array_.shape[1:] dims.
         # atom dimensions will be stored in `self._dtype`, which is different
         # than `self.dtype` in that `self._dtype` dimensions are borrowed
@@ -1308,12 +1323,15 @@ cdef class carray:
             data = json.loads(storagefh.read().decode('ascii'))
         dtype_ = np.dtype(data["dtype"])
         chunklen = data["chunklen"]
-        cparams = bcolz.cparams(
-            clevel=data["cparams"]["clevel"],
-            shuffle=data["cparams"]["shuffle"])
+        cparams = data["cparams"]
+        cparams_ = bcolz.cparams(
+            clevel = cparams["clevel"],
+            shuffle = cparams["shuffle"],
+            cname = cparams['cname'] if 'cname' in cparams else 'blosclz',
+            cstrings = cparams['cstrings'] if 'cstrings' in cparams else False)
         expectedlen = data["expectedlen"]
         dflt = data["dflt"]
-        return (shape, cparams, dtype_, dflt, expectedlen, cbytes, chunklen)
+        return (shape, cparams_, dtype_, dflt, expectedlen, cbytes, chunklen)
 
     def store_obj(self, object arrobj):
         cdef chunk chunk_
@@ -2162,6 +2180,9 @@ cdef class carray:
         cdef npy_intp schunk, echunk, nchunk, nchunks
         cdef chunk chunk_
 
+        # print "chunksize(_getrange)", self._chunksize, self.chunklen
+        # print "partitions(_getrange)", self.partitions
+        #self._chunksize = 16000
         # Check that we are inside limits
         nrows = <npy_intp> cython.cdiv(self._nbytes, self.atomsize)
         if (start + blen) > nrows:
@@ -2193,8 +2214,14 @@ cdef class carray:
                 out[nwrow:nwrow + cblen] = self.lastchunkarr[startb:stopb]
             else:
                 chunk_ = self.chunks[nchunk]
+                if chunk_.cstrings:
+                    # Activate the cstrings filter in Blosc
+                    blosc_set_cstrings(self.atomsize)
                 chunk_._getitem(startb, stopb,
                                 out.data + nwrow * self.atomsize)
+                if chunk_.cstrings:
+                    # Deactivate the cstrings filter
+                    blosc_unset_cstrings()
             nwrow += cblen
             start += cblen
 
