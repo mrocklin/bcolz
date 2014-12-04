@@ -1,9 +1,4 @@
-#!/bin/bash
-BLD_DIR=`pwd`
-
-# Recipe and source are stored together
-SRC_DIR=$RECIPE_DIR/..
-pushd $SRC_DIR
-$PYTHON setup.py install
-
-popd
+cd $RECIPE_DIR
+cd ..
+python make_version.py
+python setup.py install

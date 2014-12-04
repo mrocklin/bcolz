@@ -19,4 +19,7 @@ before_script:
 script:
   - conda build conda.recipe
 
-build_targets: conda
+build_targets: [conda]
+
+install:
+  - python setup.py develop
