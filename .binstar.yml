@@ -7,6 +7,7 @@ platform:
   - osx-64
   - win-32
   - win-64
+
 engine:
   - python=2.6
   - python=2.7
@@ -16,12 +17,12 @@ engine:
 before_script:
   - python -V
 
-script:
-  - conda build conda.recipe
-
-build_targets: [conda]
-
 install:
   - conda install cython numpy pip
   - pip install unittest2
   - python setup.py install
+
+script:
+  - conda build conda.recipe
+
+build_targets: [conda]
