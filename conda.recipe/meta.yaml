@@ -4,11 +4,6 @@ package:
 
 build:
   number: {{environ.get('BINSTAR_BUILD', 1)}}
-  script: 
-    - cd $RECIPE_DIR
-    - cd ..
-    - python make_version.py
-    - python setup.py install
 
 source:
   git_url: ../
