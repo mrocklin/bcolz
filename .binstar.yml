@@ -24,4 +24,4 @@ build_targets: [conda]
 install:
   - conda install cython numpy pip
   - pip install unittest2
-  - python setup.py develop
+  - python setup.py install
